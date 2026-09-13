@@ -152,19 +152,23 @@ function attr(row: RecordLike): Record<string, unknown> {
 export function toFinancialEntry(row: RecordLike): FinancialEntry | null {
   if (!row.id || row.kind !== FINANCIAL_ENTRY_KIND) return null;
   const a = attr(row);
-  const date = typeof a.date === "string" ? a.date : (row.occurred_at ?? "").slice(0, 10);
+  // No occurred_at fallback: financialRecordsQuery filters on attributes->>date,
+  // so a row without one never reaches here.
+  const date = typeof a.date === "string" ? a.date : "";
   if (!isValidYmd(date)) return null;
   const type = a.type === "income" || a.type === "expense" ? a.type : null;
   if (!type) return null;
+  // Another save_record caller (an agent tool) could write a financial_entry
+  // that never passed the form's rules, so re-apply them here.
   const amountCents = Number(a.amount_cents);
-  if (!Number.isFinite(amountCents) || amountCents < 0) return null;
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || amountCents > MAX_AMOUNT_MAJOR * 100) return null;
   const category = typeof a.category === "string" && a.category.trim() ? a.category.trim() : (row.title ?? "Uncategorised");
   return {
     id: row.id,
     date,
     type,
     category,
-    amountCents: Math.round(amountCents),
+    amountCents,
     note: typeof a.note === "string" && a.note.trim() ? a.note.trim() : null,
     updatedAt: row.updated_at ?? null,
   };

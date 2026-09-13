@@ -139,17 +139,61 @@ test("toFinancialEntry: drops rows that are not usable entries", () => {
   assert.equal(toFinancialEntry({ ...base, attributes: [1, 2] , occurred_at: null }), null);
 });
 
-test("toFinancialEntry: falls back to occurred_at and title", () => {
+test("toFinancialEntry: falls back to the row title, but never to occurred_at", () => {
   const e = toFinancialEntry({
     id: "r2",
     kind: "financial_entry",
     title: "Shipping",
-    attributes: { type: "income", amount_cents: 500 },
+    attributes: { date: "2026-09-09", type: "income", amount_cents: 500 },
     occurred_at: "2026-09-09T14:30:00Z",
   });
-  assert.equal(e.date, "2026-09-09");
   assert.equal(e.category, "Shipping");
   assert.equal(e.note, null);
+  // The query filters on attributes->>date, so a row without one is not ours
+  // to guess at from a UTC timestamp.
+  assert.equal(
+    toFinancialEntry({ id: "r3", kind: "financial_entry", title: "Shipping", attributes: { type: "income", amount_cents: 500 }, occurred_at: "2026-09-09T14:30:00Z" }),
+    null,
+  );
+});
+
+test("toFinancialEntry: rejects amounts the form could never have produced", () => {
+  const base = { id: "r1", kind: "financial_entry", attributes: { date: "2026-09-10", type: "expense", category: "c" } };
+  const amount = (amount_cents) => toFinancialEntry({ ...base, attributes: { ...base.attributes, amount_cents } });
+  // Another save_record caller (an agent tool) bypasses the form's rules.
+  assert.equal(amount(0), null, "zero is not an entry");
+  assert.equal(amount(-100), null);
+  assert.equal(amount(12.5), null, "cents are integers");
+  assert.equal(amount(1e300), null, "past MAX_SAFE_INTEGER a sum stops being exact");
+  assert.equal(amount(MAX_AMOUNT_MAJOR * 100 + 1), null, "over the form's cap");
+  assert.equal(amount(MAX_AMOUNT_MAJOR * 100).amountCents, MAX_AMOUNT_MAJOR * 100, "the cap itself is fine");
+});
+
+test("computeFinancialTiles: a loss that shrank is a rise, not a fall", () => {
+  // Profit is the one signed tile: dividing by a negative previous would flip
+  // the arrow and the colour on every loss-to-loss period.
+  const totals = (profitMinor) => ({
+    revenueMinor: 0,
+    orders: null,
+    aovMinor: null,
+    adSpendMinor: 0,
+    manualIncomeMinor: 0,
+    manualExpensesMinor: -profitMinor,
+    profitMinor,
+    entryCount: 1,
+    currency: "USD",
+  });
+  const shrank = computeFinancialTiles(totals(-5000), totals(-10000)).find((t) => t.key === "profit");
+  assert.equal(shrank.value, -5000);
+  assert.ok(shrank.deltaPct > 0, `a loss halving should read as +50%, got ${shrank.deltaPct}`);
+  assert.equal(shrank.deltaPct, 0.5);
+
+  const grew = computeFinancialTiles(totals(-20000), totals(-10000)).find((t) => t.key === "profit");
+  assert.ok(grew.deltaPct < 0, `a loss doubling should read as -100%, got ${grew.deltaPct}`);
+  assert.equal(grew.deltaPct, -1);
+
+  const intoProfit = computeFinancialTiles(totals(5000), totals(-10000)).find((t) => t.key === "profit");
+  assert.ok(intoProfit.deltaPct > 0, "a loss turning into a profit is a rise");
 });
 
 test("shapeEntries: keeps the range, newest first, stable on ties", () => {

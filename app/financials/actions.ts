@@ -33,6 +33,18 @@ function rangeParams(form: FormData): URLSearchParams {
   return params;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The idempotency token the form rendered, used as `save_record`'s
+ *  `external_id` — it upserts on (client_id, source, external_id), so a
+ *  resubmitted form updates its row instead of inserting a duplicate. Anything
+ *  that is not a UUID is ignored and a fresh one is minted, so a client can
+ *  only ever address a key it could have been given. */
+function entryToken(form: FormData): string {
+  const token = String(form.get("token") ?? "").trim();
+  return UUID_RE.test(token) ? token : crypto.randomUUID();
+}
+
 function fail(form: FormData, code: EntryErrorCode, echo: boolean): never {
   const params = rangeParams(form);
   params.set("error", code);
@@ -69,7 +81,7 @@ export async function createFinancialEntry(form: FormData): Promise<void> {
     await client.rpc.save_record({
       kind: FINANCIAL_ENTRY_KIND,
       attributes: entryAttributes(parsed.value),
-      external_id: crypto.randomUUID(),
+      external_id: entryToken(form),
       title: parsed.value.category,
       occurred_at: parsed.value.date,
     });

@@ -77,7 +77,7 @@ export default async function FinancialsPage({
     // ponytail: capped at PostgREST's 1000-row default, same as the home page;
     // a long range on a large ad account rolls up partial spend. Upgrade: a
     // per-range aggregate RPC in bcns-data.
-    client.views.campaign_daily_v1("day,spend_minor,currency").gte("day", range.prevFrom).lte("day", range.to).limit(ROW_LIMIT),
+    client.views.campaign_daily_v1("day,spend_minor,currency").gte("day", range.prevFrom).lte("day", range.to).order("day", { ascending: false }).limit(ROW_LIMIT),
     financialRecordsQuery(client, range.prevFrom, range.to),
   ]);
 
@@ -214,6 +214,10 @@ export default async function FinancialsPage({
           ) : null}
 
           <form className="entry-form" action={createFinancialEntry}>
+            {/* Minted per render and used as save_record's external_id, which
+                upserts on (client_id, source, external_id): a double-click or a
+                retried POST updates this row instead of writing a second one. */}
+            <input type="hidden" name="token" value={crypto.randomUUID()} />
             <input type="hidden" name="from" value={range.from} />
             <input type="hidden" name="to" value={range.to} />
             <div className="entry-form__grid">

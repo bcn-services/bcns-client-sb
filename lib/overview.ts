@@ -73,10 +73,13 @@ function safeDiv(n: number, d: number): number | null {
   return d ? n / d : null;
 }
 
-/** null when either side is absent, or previous is 0 (avoids a meaningless /0 "—"). */
+/** null when either side is absent, or previous is 0 (avoids a meaningless /0 "—").
+ *  Divides by |previous| so a signed metric (Profit) keeps the direction of the
+ *  real change: a loss that shrank is a rise, not a fall. Identical to /previous
+ *  for the non-negative metrics. */
 export function pctDeltaOrNull(current: number | null, previous: number | null): number | null {
   if (current === null || previous === null || previous === 0) return null;
-  return (current - previous) / previous;
+  return (current - previous) / Math.abs(previous);
 }
 
 export interface DailySummaryLike {
