@@ -8,6 +8,9 @@
  * implements the same interface so it never hardens into the template.
  * Keys are ALWAYS derived from canonical business ids — no name-based
  * lookups; private content via signed, expiring URLs.
+ *
+ * SB (CLIENT.md): files go through the shared platform's media RPCs
+ * (`lib/data.ts` → data-client `media.*`), so this seam stays null.
  */
 
 import type { StorageAdapter } from "@bcn-services/app-core";

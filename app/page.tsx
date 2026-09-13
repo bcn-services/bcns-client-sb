@@ -9,9 +9,9 @@ export default function HomePage() {
 
   return (
     <main>
-      <h1>Hosted Web App Template</h1>
+      <h1>SB</h1>
       <p>
-        A runnable starter for a hosted client app. AI features are{" "}
+        SB Command Center. AI features are{" "}
         <strong>{aiOn ? "enabled" : "disabled"}</strong> (set <code>AI_ENABLED=1</code> to opt in).
       </p>
       <p>

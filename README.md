@@ -1,14 +1,19 @@
 ---
 type: workflow-app
 delivery: hosted-web
-name: "@bcn-services/hosted-web-template"
-status: template
+name: "@bcn-services/bcns-client-sb"
+status: active
 ---
 
-# hosted-web template
+# sb — hosted client app
 
-A runnable **Next.js 14 (App Router, TypeScript strict)** starter for the
-standard hosted client app, matching the platform stack in
+**SB Command Center**: one dashboard over SB's Shopify, Meta Ads, Monday.com
+and Google Meet data, read from the shared bcns-data platform
+(`DATA_SOURCE=shared`), with a content library and a daily briefing. See
+[`CLIENT.md`](CLIENT.md) for the brief and config decisions.
+
+Generated from the bcns hosted-web template, a **Next.js 14 (App Router,
+TypeScript strict)** app matching the platform stack in
 `hosting-reference.md` (**DigitalOcean droplet + Supabase per-client project +
 Cloudflare**). It depends on the shared packages `@bcn-services/ui`,
 `@bcn-services/config`, and `@bcn-services/app-core` as **versioned dependencies from
@@ -16,13 +21,6 @@ GitHub Packages**, and ships the wiring points a real client build needs —
 env-driven config, a `/api/health` DB probe, webhook hygiene seams, a storage
 adapter interface, an RLS test scaffold, and an opt-in AI module — as safe,
 keyless stubs.
-
-> This is a **GitHub Template Repository**. Preferred: create a client repo
-> with the **`/new-client-repo`** Claude Code skill, which applies every
-> customization point listed in [`TEMPLATE.md`](TEMPLATE.md) and verifies the
-> build. Manual fallback: **"Use this template"** (name it
-> `bcns-client-<slug>`, keep it Private), then work through `TEMPLATE.md` by
-> hand.
 
 ## Quick start
 

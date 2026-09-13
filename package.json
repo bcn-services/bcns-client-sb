@@ -1,5 +1,5 @@
 {
-  "name": "@bcn-services/hosted-web-template",
+  "name": "@bcn-services/bcns-client-sb",
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@11.15.1",
