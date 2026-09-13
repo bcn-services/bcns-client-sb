@@ -18,6 +18,17 @@ import {
   bestCreative,
   isSafeHttpsUrl,
   formatRelativeTime,
+  formatRangeLabel,
+  formatDayLabel,
+  rangePresets,
+  rangeQuery,
+  formatMoneyWhole,
+  formatCount,
+  formatCompact,
+  formatRoas,
+  formatDeltaArrow,
+  deltaTone,
+  computeMetaMetrics,
 } from "../lib/overview.ts";
 
 test("todayInTimezone: formats as YYYY-MM-DD for a fixed instant", () => {
@@ -182,4 +193,81 @@ test("formatMoney: malformed currency code returns — instead of throwing", () 
 
 test("formatRelativeTime: unparsable timestamp returns — instead of throwing", () => {
   assert.equal(formatRelativeTime("garbage"), "—");
+});
+
+/* --------------------------------------------------------------------- *
+ * Header range helpers and artboard formatters (item A).
+ * --------------------------------------------------------------------- */
+
+test("formatRangeLabel: collapses a shared month, keeps both months, keeps both years", () => {
+  assert.equal(formatRangeLabel("2025-05-26", "2025-06-01"), "May 26 – Jun 1, 2025");
+  assert.equal(formatRangeLabel("2025-06-01", "2025-06-30"), "Jun 1 – 30, 2025");
+  assert.equal(formatRangeLabel("2025-12-28", "2026-01-03"), "Dec 28, 2025 – Jan 3, 2026");
+  assert.equal(formatRangeLabel("2025-06-01", "2025-06-01"), "Jun 1, 2025");
+});
+
+test("formatDayLabel: accepts a plain day or an ISO timestamp, em dash on junk", () => {
+  assert.equal(formatDayLabel("2025-05-30"), "May 30, 2025");
+  assert.equal(formatDayLabel("2025-05-30T14:02:00Z"), "May 30, 2025");
+  assert.equal(formatDayLabel("not-a-date"), "—");
+});
+
+test("rangePresets: 7d/30d are inclusive of today, month starts on the 1st", () => {
+  const [seven, thirty, month] = rangePresets("2026-09-12");
+  assert.deepEqual([seven.key, seven.from, seven.to], ["7d", "2026-09-06", "2026-09-12"]);
+  assert.deepEqual([thirty.key, thirty.from, thirty.to], ["30d", "2026-08-14", "2026-09-12"]);
+  assert.deepEqual([month.key, month.from, month.to], ["month", "2026-09-01", "2026-09-12"]);
+});
+
+test("rangePresets: the 7d preset matches what parseRange defaults to", () => {
+  const [seven] = rangePresets("2026-09-12");
+  const def = parseRange({}, "2026-09-12");
+  assert.deepEqual([def.from, def.to], [seven.from, seven.to]);
+});
+
+test("rangeQuery: the querystring every header link carries", () => {
+  assert.equal(rangeQuery({ from: "2026-09-01", to: "2026-09-07" }), "?from=2026-09-01&to=2026-09-07");
+});
+
+test("formatters: whole money, counts, compact, roas", () => {
+  assert.equal(formatMoneyWhole(14254000), "$142,540");
+  assert.equal(formatMoneyWhole(null), "—");
+  assert.equal(formatCount(1248.4), "1,248");
+  assert.equal(formatCount(null), "—");
+  assert.equal(formatCompact(1240000), "1.2M");
+  assert.equal(formatRoas(4.235), "4.24x");
+  assert.equal(formatRoas(null), "—");
+});
+
+test("formatDeltaArrow / deltaTone: arrows and colours track the sign", () => {
+  assert.equal(formatDeltaArrow(0.186), "↑ 18.6%");
+  assert.equal(formatDeltaArrow(-0.061), "↓ 6.1%");
+  assert.equal(formatDeltaArrow(null), "—");
+  assert.equal(deltaTone(0.1), "up");
+  assert.equal(deltaTone(-0.1), "down");
+  assert.equal(deltaTone(0), "flat");
+  assert.equal(deltaTone(null), "flat");
+});
+
+test("computeMetaMetrics: rates come from period totals, not per-day averages", () => {
+  const cur = [
+    { spend_minor: 10000, purchase_value_minor: 40000, clicks: 100, purchases: 10, impressions: 5000 },
+    { spend_minor: 10000, purchase_value_minor: 20000, clicks: 300, purchases: 10, impressions: 5000 },
+  ];
+  const prev = [{ spend_minor: 10000, purchase_value_minor: 20000, clicks: 200, purchases: 10, impressions: 4000 }];
+  const m = computeMetaMetrics(cur, prev);
+  assert.equal(m.hasData, true);
+  assert.equal(m.spend.value, 20000);
+  assert.equal(m.roas.value, 3); // 60000 / 20000, not the mean of 4 and 2
+  assert.equal(m.cpc.value, 50); // 20000 minor / 400 clicks
+  assert.equal(m.cpp.value, 1000); // 20000 minor / 20 purchases
+  assert.equal(m.impressions.value, 10000);
+  assert.equal(m.spend.deltaPct, 1);
+});
+
+test("computeMetaMetrics: no rows reads as no data, not as zeros", () => {
+  const m = computeMetaMetrics([], []);
+  assert.equal(m.hasData, false);
+  assert.equal(m.roas.value, null);
+  assert.equal(m.cpc.value, null);
 });

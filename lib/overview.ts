@@ -375,3 +375,163 @@ export function formatRelativeTime(iso: string, now: Date = new Date()): string 
   }
   return rtf.format(diffSec, "second");
 }
+
+/* ------------------------------------------------------------------ *
+ * Header date range: labels, presets, query strings.
+ * ------------------------------------------------------------------ */
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function ymdParts(ymd: string): { y: number; m: number; d: number } {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return { y: y ?? 0, m: m ?? 1, d: d ?? 1 };
+}
+
+/** Pill label for a range: "May 26 – Jun 1, 2025", collapsing a shared month/year. */
+export function formatRangeLabel(from: string, to: string): string {
+  const a = ymdParts(from);
+  const b = ymdParts(to);
+  const aMon = MONTHS[a.m - 1] ?? "";
+  const bMon = MONTHS[b.m - 1] ?? "";
+  if (from === to) return `${aMon} ${a.d}, ${a.y}`;
+  if (a.y !== b.y) return `${aMon} ${a.d}, ${a.y} – ${bMon} ${b.d}, ${b.y}`;
+  if (a.m === b.m) return `${aMon} ${a.d} – ${b.d}, ${b.y}`;
+  return `${aMon} ${a.d} – ${bMon} ${b.d}, ${b.y}`;
+}
+
+/** "May 30, 2025" for a single day (note cards, activity). */
+export function formatDayLabel(ymdOrIso: string): string {
+  const ymd = ymdOrIso.slice(0, 10);
+  if (!YMD_RE.test(ymd)) return "—";
+  const { y, m, d } = ymdParts(ymd);
+  return `${MONTHS[m - 1] ?? ""} ${d}, ${y}`;
+}
+
+export interface RangePreset {
+  key: "7d" | "30d" | "month";
+  label: string;
+  from: string;
+  to: string;
+}
+
+/** The three header presets, resolved against the client's "today". */
+export function rangePresets(today: string): RangePreset[] {
+  const { y, m } = ymdParts(today);
+  return [
+    { key: "7d", label: "Last 7 days", from: addDaysYmd(today, -6), to: today },
+    { key: "30d", label: "Last 30 days", from: addDaysYmd(today, -29), to: today },
+    { key: "month", label: "This month", from: `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-01`, to: today },
+  ];
+}
+
+/** "?from=…&to=…" — appended to every link so the range survives navigation. */
+export function rangeQuery(range: { from: string; to: string }): string {
+  return `?${new URLSearchParams({ from: range.from, to: range.to }).toString()}`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Extra formatters matching the artboard's number styles.
+ * ------------------------------------------------------------------ */
+
+/** Money with no fractional part ("$142,540") — headline sums in the artboard. */
+export function formatMoneyWhole(minorUnits: number | null, currency = "USD"): string {
+  if (minorUnits === null) return "—";
+  try {
+    const digits = new Intl.NumberFormat("en-US", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
+    return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(minorUnits / 10 ** digits);
+  } catch {
+    return "—";
+  }
+}
+
+/** Thousands-separated integer ("1,248"). */
+export function formatCount(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US").format(Math.round(value));
+}
+
+/** Compact integer ("1.2M") — impressions. */
+export function formatCompact(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+export function formatRoas(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : `${value.toFixed(2)}x`;
+}
+
+/** Delta as the artboard writes it: "↑ 18.6%" / "↓ 6.1%" / "—". */
+export function formatDeltaArrow(deltaPct: number | null): string {
+  if (deltaPct === null || !Number.isFinite(deltaPct)) return "—";
+  return `${deltaPct < 0 ? "↓" : "↑"} ${(Math.abs(deltaPct) * 100).toFixed(1)}%`;
+}
+
+export type DeltaTone = "up" | "down" | "flat";
+
+export function deltaTone(deltaPct: number | null): DeltaTone {
+  if (deltaPct === null || !Number.isFinite(deltaPct) || deltaPct === 0) return "flat";
+  return deltaPct > 0 ? "up" : "down";
+}
+
+/* ------------------------------------------------------------------ *
+ * Meta Ads panel rollup (campaign_daily_v1, current vs previous period).
+ * ------------------------------------------------------------------ */
+
+export interface MetaDailyLike extends CampaignDailyLike {
+  clicks?: unknown;
+  purchases?: unknown;
+  impressions?: unknown;
+}
+
+export interface SimpleMetric {
+  value: number | null;
+  deltaPct: number | null;
+}
+
+export interface MetaMetrics {
+  currency: string;
+  hasData: boolean;
+  spend: SimpleMetric;
+  roas: SimpleMetric;
+  cpc: SimpleMetric;
+  cpp: SimpleMetric;
+  impressions: SimpleMetric;
+}
+
+function metaTotals(rows: MetaDailyLike[]) {
+  let spend = 0;
+  let purchaseValue = 0;
+  let clicks = 0;
+  let purchases = 0;
+  let impressions = 0;
+  for (const r of rows) {
+    spend += num(r.spend_minor);
+    purchaseValue += num(r.purchase_value_minor);
+    clicks += num(r.clicks);
+    purchases += num(r.purchases);
+    impressions += num(r.impressions);
+  }
+  return { spend, purchaseValue, clicks, purchases, impressions };
+}
+
+/** Rates are recomputed from the period totals, not averaged across days. */
+export function computeMetaMetrics(currentRows: MetaDailyLike[], previousRows: MetaDailyLike[]): MetaMetrics {
+  const hasCur = currentRows.length > 0;
+  const hasPrev = previousRows.length > 0;
+  const cur = metaTotals(currentRows);
+  const prev = metaTotals(previousRows);
+  const pair = (c: number | null, p: number | null): SimpleMetric => ({
+    value: hasCur ? c : null,
+    deltaPct: hasCur && hasPrev ? pctDeltaOrNull(c, p) : null,
+  });
+  const currencyRow = [...currentRows, ...previousRows].find((r) => r.currency);
+  return {
+    currency: (currencyRow?.currency as string) ?? "USD",
+    hasData: hasCur,
+    spend: pair(cur.spend, prev.spend),
+    roas: pair(safeDiv(cur.purchaseValue, cur.spend), safeDiv(prev.purchaseValue, prev.spend)),
+    cpc: pair(safeDiv(cur.spend, cur.clicks), safeDiv(prev.spend, prev.clicks)),
+    cpp: pair(safeDiv(cur.spend, cur.purchases), safeDiv(prev.spend, prev.purchases)),
+    impressions: pair(cur.impressions, prev.impressions),
+  };
+}
