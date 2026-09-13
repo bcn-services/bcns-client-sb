@@ -34,7 +34,8 @@ layer; it never writes back to those systems.
   The dashboard doesn't rebuild those services' pages.
 - **Only these live in the dashboard:** the combined data on the home view, the
   Content Library (with the Creative Folder), and the Financial Information
-  page. You reach each one by clicking its panel on home, not through a nav.
+  page. You reach each one by its header button or by clicking its panel on
+  home, not through a nav (amended 2026-09-13).
 - **No agent.** The reference's "Ask the Command Center anything" strip and its
   quick actions are out; the AI Agent is scoped as a separate product. The
   Daily Briefing stays (it's in the signed quote).
@@ -46,10 +47,11 @@ layer; it never writes back to those systems.
 - **Settings and Integrations** are icon buttons in the header, each opening a
   popup. Integrations shows each connection's status. This replaces the
   `/integrations` page.
-- **Visual target:** match `~/os/clients/sb/SB_Reference.PNG` exactly (layout,
-  colors, type, cards, pink accent), minus its sidebar. Nate may send a design
-  file with exact values; prefer it over the PNG when it exists. Style each new
-  page to this target as it's built, not in a pass at the end.
+- **Visual target:** the Claude Design artboard committed at
+  `design/Saunaboy Command Center.dc.html`, digested with the functional spec
+  in **`DESIGN.md`** (the build contract; it wins over this section).
+  `~/os/clients/sb/SB_Reference.PNG` is fallback only. Style each new page to
+  this target as it's built, not in a pass at the end.
 
 ## Config decisions
 
