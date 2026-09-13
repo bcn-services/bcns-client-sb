@@ -49,12 +49,14 @@ export async function loadShellData(client: DataClient): Promise<ShellData> {
 }
 
 /** The signed-in address for the Settings popup. middleware.ts already
- *  verified the session with getUser() for this request, so reading the
- *  cookie session here costs no extra auth round trip. */
+ *  verified the session with getUser() for this request, so this call hits a
+ *  warm session. */
 export async function getSignedInEmail(): Promise<string | null> {
   const { createSupabaseServer } = await import("./supabase-server");
   const supabase = createSupabaseServer();
   if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user.email ?? null;
+  // getUser(), not getSession(): the session's user comes straight off the
+  // cookie and Supabase warns it may not be authentic.
+  const { data } = await supabase.auth.getUser();
+  return data.user?.email ?? null;
 }
