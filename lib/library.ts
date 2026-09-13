@@ -63,15 +63,18 @@ export function mediaLabel(row: MediaLike): string {
 }
 
 /**
- * The storage path to sign for a thumbnail. `thumb_path` is never populated for
- * dashboard uploads (`data.register_media` doesn't derive one), so an image
- * falls back to its own full-quality object — signing a path costs no egress,
- * only `download_url` does. Non-images get no thumb and render a placeholder.
+ * The storage path to sign for a thumbnail — `thumb_path` and nothing else.
+ *
+ * The original under `<client>/orig/` is deliberately NOT a fallback: the
+ * storage policy `media_read_orig` only signs an original while a download
+ * ticket for it exists (`data.has_download_ticket`), so an orig path signs for
+ * the few minutes after a download and fails silently the rest of the time —
+ * an inconsistent, flickering grid. Every row without a thumbnail renders the
+ * placeholder tile DESIGN.md asks for. See the report: the platform never
+ * populates `thumb_path` today, so that is every dashboard upload.
  */
 export function mediaThumbPath(row: MediaLike): string | null {
-  if (row.thumb_path) return row.thumb_path;
-  const isImage = row.kind === "image" || (row.mime ?? "").startsWith("image/");
-  return isImage ? (row.storage_path ?? null) : null;
+  return row.thumb_path ?? null;
 }
 
 /** Human byte size: "812 B", "9.4 KB", "24 MB", "1.5 GB". */
@@ -224,9 +227,9 @@ export function groupSetItems(items: SetItemLike[]): Map<string, string[]> {
 }
 
 /**
- * A set's cover. `media_sets_v1.cover_thumb_path` reads the newest member's
- * `thumb_path`, which dashboard uploads never have, so fall back to the newest
- * member's own image path.
+ * A set's cover: the view's own `cover_thumb_path`, else the newest member that
+ * has a thumbnail. Both are null for dashboard uploads today (see
+ * mediaThumbPath), so the set list renders the placeholder cover.
  */
 export function setCoverPath(
   set: MediaSetLike,

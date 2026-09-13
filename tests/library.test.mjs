@@ -37,11 +37,13 @@ test("mediaLabel prefers the title, falls back to filename then Untitled", () =>
   assert.equal(mediaLabel({}), "Untitled");
 });
 
-test("mediaThumbPath falls back to the original for images only", () => {
+test("mediaThumbPath signs the thumbnail only, never the original", () => {
+  // `<client>/orig/` is only signable while a download ticket exists, so a row
+  // without a thumb_path must render the placeholder instead.
   assert.equal(mediaThumbPath({ thumb_path: "t.jpg", storage_path: "o.jpg" }), "t.jpg");
-  assert.equal(mediaThumbPath({ kind: "image", storage_path: "o.jpg" }), "o.jpg");
-  assert.equal(mediaThumbPath({ mime: "image/png", storage_path: "o.png" }), "o.png");
-  assert.equal(mediaThumbPath({ mime: "video/mp4", storage_path: "o.mp4" }), null);
+  assert.equal(mediaThumbPath({ kind: "image", storage_path: "c/orig/u.jpg" }), null);
+  assert.equal(mediaThumbPath({ mime: "image/png", storage_path: "c/orig/u.png" }), null);
+  assert.equal(mediaThumbPath({}), null);
 });
 
 test("formatBytes scales and never prints a negative or NaN", () => {
@@ -155,10 +157,10 @@ test("groupSetItems buckets by set, newest addition first", () => {
 test("setCoverPath uses the view's cover, else the newest member with a thumb", () => {
   const byId = new Map([
     ["m1", { kind: "video", storage_path: "v.mp4" }],
-    ["m2", { kind: "image", storage_path: "i.png" }],
+    ["m2", { kind: "image", storage_path: "i.png", thumb_path: "i-thumb.png" }],
   ]);
   assert.equal(setCoverPath({ cover_thumb_path: "c.jpg" }, ["m1"], byId), "c.jpg");
-  assert.equal(setCoverPath({}, ["m1", "m2"], byId), "i.png");
+  assert.equal(setCoverPath({}, ["m1", "m2"], byId), "i-thumb.png");
   assert.equal(setCoverPath({}, ["m1"], byId), null);
   assert.equal(setCoverPath({}, undefined, byId), null);
 });
