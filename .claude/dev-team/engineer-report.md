@@ -1,54 +1,33 @@
 # Engineer Report
-**Task:** Item A — shell + home for the SB Command Center rebuild (header, popups, date range, home grid, stub pages, design tokens)
-**Branch:** feat/shell-home (worktree `.claude/worktrees/shell-home`)
-**Date:** 2026-09-12
+**Task:** Item D — Monday.com + Google Meet home panels for the SB Command Center rebuild
+**Branch:** feat/monday-meet-panels (worktree `.claude/worktrees/monday-meet-panels`, stacked on feat/shell-home @ 6653b70)
+**Date:** 2026-09-13
 
 ## Design Decisions
-- Header renders per page (`AppHeader`), not in `app/layout.tsx`: App Router layouts never receive `searchParams`, and every header control is driven by `?from&to` — this deviates from the spawn prompt's literal "new header in layout.tsx" and is listed under conflicts below.
-- Popups are native `<details>` + CSS with no client JS; `?popup=integrations|settings` seeds `open` server-side so a panel's "Connect …" link can open the Integrations popup (a fragment link cannot set `open`, which DESIGN.md's "link that opens the popup" otherwise requires).
-- Date pill writes `?from&to` only — `lib/overview.ts parseRange` stays the single range parser; presets are pure (`rangePresets`) and the custom form is a plain `<form method="get">` with `<input type="date">`, so no date library.
-- Panel state is derived from `connector_health_v1` alone (`lib/panels.ts panelState`): a panel with no health row reads not-connected even if rows exist, so an empty SB account renders the state Nate sees first rather than fake zeros.
-- Meet and Monday panels take `notes` / `tasks` props and are handed `[]` today — that is item D's seam onto `jobs_v1` / `messages_v1`; full chrome and all three states already render.
-- Financial rows: Expenses = ad spend + `manualExpensesMinor` (absent today), Profit = revenue − expenses. `FinancialInputs.manualExpensesMinor` is item B's seam.
-- All pure logic (range labels, presets, formatters, Meta rollup, panel state, financial rows) lives in `lib/*.ts` with `tsx --test` unit tests; components stay render-only.
-- Money stays in minor units to the render boundary; rates (ROAS/CPC/CPP) are recomputed from period totals, never averaged across days.
+- Item A already built full panel chrome, all three states, and every shaping helper (`sortPriorityTasks`, `taskBadge`, `sortRecentNotes`, `noteExcerpt` in `lib/panels.ts`) — this item is pure wiring: two reads + props, no new logic.
+- DB query narrows to `kind='task'` / `kind='meeting_note'`, ordered, `limit(50)` (well above the panels' top-5/top-3); final sort/tone/nulls-last stays entirely in `lib/panels.ts`, called inside `MeetPanel`/`MondayPanel` — DB order is only a coarse pre-cap, not the display order.
+- `mondayState`/`meetState` now derive from real row presence (`taskRows.length > 0` / `noteRows.length > 0`) instead of the hardcoded `false` item A left as the seam marker.
+- A failed `jobs_v1`/`messages_v1` read degrades to `[]` (not-connected/empty rendering) via the same `unwrap`/`Promise.allSettled` pattern as every other home read — it cannot blank the page.
+- No CSS changes: item A's panel chrome already renders all three states correctly for Meet/Monday, confirmed live.
 
 ## Files Changed
-- `app/layout.tsx` — sidebar removed; `Inter_Tight` via `next/font/google` (fallback `system-ui, sans-serif`) exposed as `--font-inter-tight`; body wraps children in `.page`.
-- `app/globals.css` — rewritten: the full DESIGN.md token table as CSS variables plus every header/tile/panel/row/badge/popup class and the ~1100px and 720px breakpoints; old dark-mode and blue-accent template styles dropped.
-- `app/_components/AppHeader.tsx` — title + tagline, page buttons with active state, Integrations popup, Settings popup (email / client / timezone / sign out), date-range pill with presets and custom form.
-- `app/_components/icons.tsx` — SVG icons traced from `design/Saunaboy Command Center.dc.html`, plus `SourceTile`.
-- `app/_components/Panel.tsx` — `Panel`, `PanelHead`, `DataRow`, `Delta`, `ViewAll`, `PanelButton`, `StateNote`, `Unconfigured`.
-- `app/_components/MetricCard.tsx` — metric tile and the 200×34 sparkline; renders `—` with no delta when a source is empty.
-- `app/_components/MeetPanel.tsx`, `app/_components/MondayPanel.tsx` — full chrome with the three states; row props are item D's seam.
-- `app/page.tsx` — rewritten as the home grid: 6 metric tiles, Shopify / Meta Ads / Financial Information, Google Meet / Monday.com / Content Library / Recent Activity; six `Promise.allSettled` reads so one failing view cannot blank the page.
-- `app/financials/page.tsx`, `app/library/page.tsx` — stubs with the shared header, active button, and one "this page arrives next" panel (items B and C replace them).
-- `app/integrations/page.tsx` — deleted; the route now 404s and its content lives in the header popup.
-- `app/login/actions.ts` — added `signOut()` reusing the existing `createSupabaseServer` + `redirect("/login")` pattern.
-- `lib/overview.ts` — appended `formatRangeLabel`, `formatDayLabel`, `rangePresets`, `rangeQuery`, `formatMoneyWhole`, `formatCount`, `formatCompact`, `formatRoas`, `formatDeltaArrow`, `deltaTone`, `computeMetaMetrics`.
-- `lib/panels.ts` (new) — expected sources, `panelState`, Integrations-popup rows, task/note shaping.
-- `lib/financials.ts` (new) — `computeFinancialRows`.
-- `lib/links.ts` (new) — outbound service targets + `EXTERNAL_LINK_PROPS` (`target=_blank`, `rel=noopener noreferrer`).
-- `lib/header.ts` (new) — `loadShellData` (client name, timezone, connector health via `Promise.allSettled`) and `getSignedInEmail` (uses `auth.getUser()`, not the cookie session).
-- `tests/panels.test.mjs`, `tests/financials.test.mjs` (new) and `tests/overview.test.mjs` (extended) — 70 passing assertions; registered in `package.json`'s `test` script.
-- `eslint.config.mjs` — ignore `design/**` (the vendored artboard export lints with 13 pre-existing errors from commit abf8cbb and is not app source).
+- `app/page.tsx` — added `jobs_v1` (`kind='task'`, ordered `due_on` asc nullsFirst:false, limit 50) and `messages_v1` (`kind='meeting_note'`, ordered `occurred_at` desc, limit 50) to the home `Promise.allSettled`; unwrapped alongside the existing six reads; `mondayState`/`meetState` computed from row presence; `MeetPanel`/`MondayPanel` now receive real `notes`/`tasks` rows instead of `[]`.
+- `tests/panels.test.mjs` — added two tests: `sortPriorityTasks` defaults to a 5-row cap and `sortRecentNotes` defaults to a 3-row cap, each from a synthetic 50-row batch (matching the new server-side cap). Sort order, nulls-last, tone rule, and excerpt trimming were already covered by item A's tests and needed no changes.
 
 ## Verification
 - `corepack pnpm typecheck` → `$ tsc --noEmit` (no output, exit 0)
 - `corepack pnpm lint` → `$ eslint .` (no output, exit 0)
-- `corepack pnpm test` → `# tests 71 / # pass 70 / # fail 0 / # skipped 1`
-- `corepack pnpm build` → `✓ Generating static pages (7/7)`; routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health`
-- Live pass signed in as smoke+sb on `:3101`: home renders the full grid with every panel not-connected; Integrations popup lists all five sources as "Not connected"; Settings shows the email, client "SB", `America/New_York`, and sign out redirects to `/login`; the pill's "Last 30 days" wrote `?from=2026-08-15&to=2026-09-13` and the label followed; header buttons reached `/financials` and `/library` carrying the range; `?popup=integrations` opened the popup on arrival; `/integrations` 404s; console clean (one React DevTools info line).
+- `corepack pnpm test` → `# tests 78 / # pass 77 / # fail 0 / # skipped 1`
+- `corepack pnpm build` → `✓ Compiled successfully`, `✓ Generating static pages (7/7)`, routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health`
+- Signed-in smoke via `shot.mjs` on `:3104` as smoke+sb: home renders the full grid; Meet and Monday both show their not-connected state ("Not connected yet. Connect Google Meet" / "Not connected yet. Connect Monday.com") — correct, since `connector_health_v1` has no rows for `monday`/`meet` on this SB account (matches every other panel). Integrations popup, Settings popup, and the range pill all opened correctly; `/financials` and `/library` reached. Dev log (`dev-3104.log`) has no errors from the two new reads (or anywhere else) across all navigations.
 
 ## Deferred / Out of Scope
-- Meet/Monday rows, Financial manual figures, and the real `/financials` and `/library` pages — items B, C, D.
-- `lib/links.ts` targets are generic landing pages; SB's Shopify store handle, Meta `act_id`, and Monday board slug will replace them.
-- `campaign_daily_v1` / `creative_daily_v1` reads are capped at 1000 rows (PostgREST default) — marked with a `ponytail:` comment; a long range on a large account would roll up partial data.
-- Responsive breakpoints were written to DESIGN.md's spec but only verified at desktop width in the browser.
+- Live "data" state for Meet/Monday is unverified end-to-end against real rows (no `jobs_v1`/`messages_v1` rows exist in this SB account yet) — the shaping logic itself (sort, tone, excerpt, caps) is unit-tested in `tests/panels.test.mjs` by item A and this item, and the query/prop wiring is now live; QA can seed rows via the data client to exercise the data state if desired.
+- Everything else (Financial Information, Content Library, header, shell) is out of scope per DESIGN.md — items B/C.
 
 ## Flags for Reviewer
-- `app/page.tsx` issues six view reads per request with `dynamic = "force-dynamic"` and no caching; `campaign_daily_v1` and `creative_daily_v1` are the two that can grow with account size and range.
-- `getSignedInEmail()` calls `auth.getUser()` on every page render — one extra auth round trip per request on top of middleware's.
-- `client.media.thumbUrls()` is wrapped in try/catch and degrades to placeholder tiles; signed-URL expiry is not handled.
-- Popups are `<details>` with no outside-click or Escape dismissal — they close only via their own summary.
-- The range comes straight from the query string into `parseRange`; the 366-day cap and reversed-range fallback there are the only guards.
+- `jobs_v1`/`messages_v1` reads have no date-range filter (Monday/Meet panels are not range-bound per DESIGN.md — "Priority Tasks" and "Recent Meeting Notes" are point-in-time, not range metrics), only a `limit(50)` cap; a board/inbox with heavy task/note churn could still see a stale top-5/3 if the 50-row window rolls past the true priority set. Upgrade: a `kind`+`is_done`/`occurred_at`-aware server-side pre-sort if this becomes visible in practice.
+- Same PostgREST-default-limit caveat item A flagged for `campaign_daily_v1`/`creative_daily_v1` applies here in spirit, but at a much smaller, deliberately-chosen cap (50 vs the display need of 5/3), so the risk surface is small.
+
+## Conflicts with DESIGN.md
+None found — item A's seam (props, states, chrome) matched the spec exactly; this item only needed to supply real data.
