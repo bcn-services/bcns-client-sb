@@ -13,6 +13,7 @@ import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
 import { computeFinancialRows } from "@/lib/financials";
 import { panelState } from "@/lib/panels";
+import { mediaThumbPath } from "@/lib/library";
 import {
   aggregateCampaigns,
   bestCreative,
@@ -125,7 +126,7 @@ export default async function HomePage({
   const mediaRows = media.error ? [] : (media.data ?? []);
   const libraryTiles = [
     ...setRows.map((s) => ({ key: `set-${s.id}`, name: s.name ?? "Untitled set", sub: `${s.file_count ?? 0} Files`, thumbPath: s.cover_thumb_path })),
-    ...mediaRows.map((m) => ({ key: `media-${m.id}`, name: m.title ?? m.filename ?? "Untitled", sub: m.kind ?? "File", thumbPath: m.thumb_path })),
+    ...mediaRows.map((m) => ({ key: `media-${m.id}`, name: m.title ?? m.filename ?? "Untitled", sub: m.kind ?? "File", thumbPath: mediaThumbPath(m) })),
   ].slice(0, 6);
 
   const thumbPaths = [
