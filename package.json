@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "agent": "tsx agent/index.ts",
-    "test": "tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs",
+    "test": "tsx --test tests/ai-optin.test.mjs tests/qa-hosted-web.test.mjs tests/rls-forbidden-read.test.mjs tests/shared-mode.test.mjs tests/agent.test.mjs tests/overview.test.mjs",
     "clean": "rm -rf .next .turbo node_modules"
   },
   "dependencies": {
