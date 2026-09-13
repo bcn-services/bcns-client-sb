@@ -984,3 +984,250 @@ summary::-webkit-details-marker {
   font-size: 12.5px;
   color: var(--text-faint);
 }
+
+/* === item B: financials ===================================================
+ * The /financials page only: a 7-wide metric row, the daily breakdown table,
+ * and the manual entries form + list. Everything else reuses the panel, row,
+ * badge and button classes above.
+ * ========================================================================= */
+
+.metric-row--7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.fin-grid {
+  display: grid;
+  grid-template-columns: 1.32fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .metric-row--7 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .fin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .metric-row--7 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ------------------------------------------------------ daily breakdown */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.fin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.fin-table th {
+  padding: 0 0 8px;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-faint);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--hairline-row);
+}
+
+.fin-table td {
+  padding: 9px 0;
+  color: var(--text-body);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--hairline-row);
+}
+
+.fin-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.fin-table th + th,
+.fin-table td + td {
+  padding-left: 14px;
+}
+
+.fin-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.fin-table__num--strong {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.fin-table__num--neg {
+  color: var(--down);
+}
+
+/* --------------------------------------------------------- entries form */
+
+.entry-form__hint {
+  margin: -6px 0 12px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+
+.form-error {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--down);
+}
+
+.entry-form {
+  margin-bottom: 14px;
+}
+
+.entry-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.field--wide {
+  grid-column: 1 / -1;
+}
+
+.field__label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.field__optional {
+  font-weight: 400;
+  color: var(--text-placeholder);
+}
+
+.field__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-control);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.field__input:focus-visible {
+  border-color: var(--accent-chrome-border);
+}
+
+.field__input--area {
+  resize: vertical;
+  min-height: 46px;
+}
+
+.entry-form .btn-accent {
+  margin-top: 0;
+}
+
+/* --------------------------------------------------------- entries list */
+
+.entry-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline-list);
+}
+
+.entry-list .entry-row:last-child {
+  border-bottom: none;
+}
+
+.entry-row__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.entry-row__category {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.entry-row__date {
+  font-size: 11.5px;
+  color: var(--text-placeholder);
+  white-space: nowrap;
+}
+
+.entry-row__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.entry-row__tail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.entry-row__amount {
+  font-size: 13.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-row__amount--income {
+  color: var(--up);
+}
+
+.entry-row__amount--expense {
+  color: var(--text);
+}
+
+.btn-link-danger {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-placeholder);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-link-danger:hover {
+  color: var(--down);
+}
