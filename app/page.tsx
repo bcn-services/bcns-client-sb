@@ -64,7 +64,7 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR] = await Promise.allSettled([
+  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, tasksR, notesR] = await Promise.allSettled([
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
     // a long range gets partial rollups. Upgrade: a per-range aggregate RPC in
@@ -74,6 +74,10 @@ export default async function HomePage({
     client.views.media_sets_v1().order("created_at", { ascending: false }).limit(6),
     client.views.media_v1().is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(5),
+    // ponytail: capped at 50 (well above the panel's top-5), sorting/tone stay
+    // in lib/panels.ts so the DB just narrows the row count.
+    client.views.jobs_v1().eq("kind", "task").order("due_on", { ascending: true, nullsFirst: false }).limit(50),
+    client.views.messages_v1().eq("kind", "meeting_note").order("occurred_at", { ascending: false }).limit(50),
   ]);
 
   const summary = unwrap(summaryR);
@@ -82,6 +86,8 @@ export default async function HomePage({
   const mediaSets = unwrap(mediaSetsR);
   const media = unwrap(mediaR);
   const activity = unwrap(activityR);
+  const tasks = unwrap(tasksR);
+  const notes = unwrap(notesR);
 
   for (const [name, r] of [
     ["daily_summary_v1", summary],
@@ -90,6 +96,8 @@ export default async function HomePage({
     ["media_sets_v1", mediaSets],
     ["media_v1", media],
     ["activity_v1", activity],
+    ["jobs_v1", tasks],
+    ["messages_v1", notes],
   ] as const) {
     if (r.error) console.error(`home: ${name} read failed`, r.error instanceof Error ? r.error.message : r.error);
   }
@@ -117,9 +125,10 @@ export default async function HomePage({
     ["shopify", "meta"],
     (!summary.error && summarySplit.current.length > 0) || (!campaigns.error && campaignSplit.current.length > 0),
   );
-  // Item D wires these two to jobs_v1 / messages_v1; the panels already take rows.
-  const mondayState = panelState(shell.health, ["monday"], false);
-  const meetState = panelState(shell.health, ["meet"], false);
+  const taskRows = tasks.error ? [] : (tasks.data ?? []);
+  const noteRows = notes.error ? [] : (notes.data ?? []);
+  const mondayState = panelState(shell.health, ["monday"], taskRows.length > 0);
+  const meetState = panelState(shell.health, ["meet"], noteRows.length > 0);
 
   const setRows = mediaSets.error ? [] : (mediaSets.data ?? []);
   const mediaRows = media.error ? [] : (media.data ?? []);
@@ -197,8 +206,8 @@ export default async function HomePage({
       </div>
 
       <div className="grid-secondary">
-        <MeetPanel state={meetState} notes={[]} connectHref={connectHref} />
-        <MondayPanel state={mondayState} tasks={[]} connectHref={connectHref} />
+        <MeetPanel state={meetState} notes={noteRows} connectHref={connectHref} />
+        <MondayPanel state={mondayState} tasks={taskRows} connectHref={connectHref} />
 
         <Panel className="panel--column">
           <PanelHead tile={<LibraryIcon />} title="Content Library" small right={<ViewAll href={`/library${query}`} />} />
