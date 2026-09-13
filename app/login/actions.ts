@@ -12,3 +12,9 @@ export async function signIn(form: FormData): Promise<void> {
   });
   redirect(error ? "/login?error=invalid" : "/");
 }
+
+export async function signOut(): Promise<void> {
+  const supabase = createSupabaseServer();
+  await supabase?.auth.signOut();
+  redirect("/login");
+}
