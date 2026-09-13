@@ -10,6 +10,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  firstParam,
+  lookupMessage,
+  uploadStatus,
   MAX_BULK_IDS,
   collectTags,
   egressLine,
@@ -169,4 +172,37 @@ test("fileCountLabel singularises", () => {
   assert.equal(fileCountLabel(1), "1 File");
   assert.equal(fileCountLabel(0), "0 Files");
   assert.equal(fileCountLabel(null), "0 Files");
+});
+
+test("firstParam survives a repeated search parameter", () => {
+  // Next hands ?tag=a&tag=b over as an array; .toLowerCase() on it would 500.
+  assert.equal(firstParam(["summer", "hero"]), "summer");
+  assert.equal(firstParam("summer"), "summer");
+  assert.equal(firstParam(undefined), "");
+  assert.equal(firstParam(null), "");
+  assert.equal(firstParam([]), "");
+  assert.equal(firstParam([undefined]), "");
+  assert.equal(firstParam("abcdef", 3), "abc");
+  assert.equal(firstParam(["abcdef", "x"], 2), "ab");
+});
+
+test("lookupMessage never reaches Object.prototype", () => {
+  const map = { failed: "That didn't work." };
+  assert.equal(lookupMessage(map, "failed"), "That didn't work.");
+  assert.equal(lookupMessage(map, "nope"), null);
+  assert.equal(lookupMessage(map, "__proto__"), null);
+  assert.equal(lookupMessage(map, "constructor"), null);
+  assert.equal(lookupMessage(map, "toString"), null);
+  assert.equal(lookupMessage(map, "hasOwnProperty"), null);
+});
+
+test("uploadStatus names the failure on a partial batch", () => {
+  assert.deepEqual(uploadStatus(3, 3, null), { text: "Uploaded 3 files.", bad: false });
+  assert.deepEqual(uploadStatus(1, 1, null), { text: "Uploaded 1 file.", bad: false });
+  assert.deepEqual(uploadStatus(1, 3, "b.png: denied"), {
+    text: "Uploaded 1 of 3 — b.png: denied",
+    bad: true,
+  });
+  // Nothing uploaded at all still reports the error, never a success line.
+  assert.equal(uploadStatus(0, 2, "a.png: denied").bad, true);
 });

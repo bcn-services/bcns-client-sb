@@ -21,8 +21,10 @@ import {
   egressLine,
   fileCountLabel,
   filterMedia,
+  firstParam,
   formatBytes,
   groupSetItems,
+  lookupMessage,
   mediaLabel,
   mediaThumbPath,
   parseIdList,
@@ -69,16 +71,20 @@ function unwrap<T>(r: PromiseSettledResult<{ data: T | null; error: unknown }>, 
   return r.value;
 }
 
+// Next hands these over as `string | string[]` whenever a parameter repeats
+// (`?tag=a&tag=b`), so every value goes through firstParam() before use.
+type Param = string | string[] | undefined;
+
 interface LibrarySearchParams {
-  from?: string;
-  to?: string;
-  popup?: string;
-  q?: string;
-  tag?: string;
-  set?: string;
-  item?: string;
-  dl?: string;
-  error?: string;
+  from?: Param;
+  to?: Param;
+  popup?: Param;
+  q?: Param;
+  tag?: Param;
+  set?: Param;
+  item?: Param;
+  dl?: Param;
+  error?: Param;
 }
 
 export default async function LibraryPage({ searchParams }: { searchParams: LibrarySearchParams }) {
@@ -87,15 +93,16 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
 
   const [shell, email] = await Promise.all([loadShellData(client), getSignedInEmail()]);
   const today = todayInTimezone(shell.timezone);
-  const range = parseRange(searchParams, today);
+  const range = parseRange({ from: firstParam(searchParams.from, 10), to: firstParam(searchParams.to, 10) }, today);
 
-  const q = (searchParams.q ?? "").slice(0, 120);
-  const tag = (searchParams.tag ?? "").slice(0, 40).toLowerCase();
-  const openSetId = parseIds([searchParams.set])[0] ?? null;
-  const openItemId = parseIds([searchParams.item])[0] ?? null;
-  const trayIds = parseIdList(searchParams.dl);
-  const errorCode = (searchParams.error ?? "") as LibraryError;
-  const errorMessage = ERRORS[errorCode] ?? null;
+  const q = firstParam(searchParams.q, 120);
+  const tag = firstParam(searchParams.tag, 40).toLowerCase();
+  const openSetId = parseIds([firstParam(searchParams.set, 36)])[0] ?? null;
+  const openItemId = parseIds([firstParam(searchParams.item, 36)])[0] ?? null;
+  const trayIds = parseIdList(firstParam(searchParams.dl, 40 * 500));
+  // Never index ERRORS with a raw parameter: `?error=__proto__` would otherwise
+  // hand React an object and 500 the page.
+  const errorMessage = lookupMessage(ERRORS, firstParam(searchParams.error, 40));
 
   const [mediaR, setsR, itemsR, egressR] = await Promise.allSettled([
     client.views
@@ -175,7 +182,7 @@ export default async function LibraryPage({ searchParams }: { searchParams: Libr
         email={email}
         health={shell.health}
         healthError={shell.healthError}
-        openPopup={parsePopup(searchParams.popup)}
+        openPopup={parsePopup(firstParam(searchParams.popup, 20))}
       />
 
       <div className="page-title-row">

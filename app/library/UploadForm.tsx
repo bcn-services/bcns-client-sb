@@ -25,7 +25,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { registerUpload } from "./actions";
-import { MAX_UPLOAD_BYTES, formatBytes, parseTags, storagePath } from "@/lib/library";
+import { MAX_UPLOAD_BYTES, formatBytes, parseTags, storagePath, uploadStatus } from "@/lib/library";
 
 export function UploadForm({
   supabaseUrl,
@@ -66,6 +66,9 @@ export function UploadForm({
     setBusy(true);
     const supabase = createBrowserClient(supabaseUrl, anonKey);
     let done = 0;
+    // A batch that stops part-way must report the failure, so the final status
+    // is written once, from here, rather than left to whichever branch ran last.
+    let lastError: string | null = null;
     try {
       for (const file of files) {
         setStatus({ text: `Uploading ${file.name} (${done + 1} of ${files.length})…`, bad: false });
@@ -74,7 +77,7 @@ export function UploadForm({
           contentType: file.type || "application/octet-stream",
         });
         if (error) {
-          setStatus({ text: `${file.name}: ${error.message}`, bad: true });
+          lastError = `${file.name}: ${error.message}`;
           break;
         }
         // Only the path crosses the action body — never the file.
@@ -85,18 +88,22 @@ export function UploadForm({
           ...(tags.length ? { tags } : {}),
         });
         if (!result.ok) {
-          setStatus({ text: `${file.name}: ${result.error}`, bad: true });
+          lastError = `${file.name}: ${result.error}`;
+          // The object is already stored but nothing references it, and
+          // purge_after only reaps `data.media` rows — so drop it here rather
+          // than bill the client for an invisible file on every retry.
+          await supabase.storage.from("media").remove([path]).catch(() => undefined);
           break;
         }
         done += 1;
       }
     } catch (err) {
-      setStatus({ text: err instanceof Error ? err.message : "Upload failed.", bad: true });
+      lastError = err instanceof Error ? err.message : "Upload failed.";
     } finally {
       setBusy(false);
+      if (done || lastError) setStatus(uploadStatus(done, files.length, lastError));
       if (done) {
         form.reset();
-        setStatus({ text: `Uploaded ${done} file${done === 1 ? "" : "s"}.`, bad: false });
         router.refresh();
       }
     }

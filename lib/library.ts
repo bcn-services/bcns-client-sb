@@ -250,3 +250,33 @@ export function fileCountLabel(count: number | null | undefined): string {
   const n = Number(count ?? 0);
   return `${n} ${n === 1 ? "File" : "Files"}`;
 }
+
+/**
+ * App-Router `searchParams` values are `string | string[]` at runtime whatever
+ * the page's interface declares (`?tag=a&tag=b` yields an array), so every
+ * parameter is normalized here before anything calls a string method on it.
+ * A repeated parameter keeps its first value; everything else becomes "".
+ */
+export function firstParam(value: string | string[] | null | undefined, max = 200): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return typeof raw === "string" ? raw.slice(0, max) : "";
+}
+
+/**
+ * Look a message up in a literal map without letting a caller-supplied key
+ * reach `Object.prototype` — `map["__proto__"]` otherwise returns an object
+ * that React refuses to render, so `?error=__proto__` would 500 the page.
+ */
+export function lookupMessage(map: Record<string, string>, code: string): string | null {
+  return Object.prototype.hasOwnProperty.call(map, code) ? (map[code] ?? null) : null;
+}
+
+/**
+ * The line shown after an upload batch. A batch that failed part-way must name
+ * the failure — reporting "Uploaded 1 file." when files 2-3 were skipped is
+ * worse than reporting nothing.
+ */
+export function uploadStatus(done: number, total: number, lastError: string | null): { text: string; bad: boolean } {
+  if (lastError) return { text: `Uploaded ${done} of ${total} — ${lastError}`, bad: true };
+  return { text: `Uploaded ${done} file${done === 1 ? "" : "s"}.`, bad: false };
+}

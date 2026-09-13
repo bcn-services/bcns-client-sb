@@ -1274,9 +1274,12 @@ summary::-webkit-details-marker {
   color: var(--text-muted);
 }
 
-/* Zero-JS selection: the bar appears once any checkbox in the form is checked. */
+/* Zero-JS selection: the bar hides itself while nothing is checked. Written as
+   a hide rather than a reveal so a browser without :has() (or without the
+   selector() query itself) leaves the bar permanently visible — degraded, not
+   an unreachable bulk bar. */
 .bulk-bar {
-  display: none;
+  display: flex;
   position: sticky;
   bottom: 12px;
   margin-top: 14px;
@@ -1289,8 +1292,10 @@ summary::-webkit-details-marker {
   background: var(--accent-chrome);
 }
 
-.media-form:has(.media-check:checked) .bulk-bar {
-  display: flex;
+@supports selector(:has(*)) {
+  .media-form:not(:has(.media-check:checked)) .bulk-bar {
+    display: none;
+  }
 }
 
 .bulk-bar__label {

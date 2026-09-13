@@ -19,6 +19,9 @@ import { revalidatePath } from "next/cache";
 import { getDataClient } from "@/lib/data";
 import { MAX_UPLOAD_BYTES, parseIds, parseTags, validateSetName } from "@/lib/library";
 
+/** Ids the ?dl= tray carries; more would push the redirect past Node's 16 KB header limit. */
+const DL_TRAY_MAX = 50;
+
 /** Error codes page.tsx knows how to phrase. */
 export type LibraryError =
   | "unconfigured"
@@ -38,7 +41,7 @@ export type LibraryError =
  */
 function safeBack(value: FormDataEntryValue | null): string {
   const raw = String(value ?? "");
-  return /^\?[A-Za-z0-9=&%,.:_+-]*$/.test(raw) ? raw : "";
+  return /^\?[A-Za-z0-9=&%,.:_+*-]*$/.test(raw) ? raw : "";
 }
 
 /** Drop one parameter from a `?a=1&b=2` string, keeping it well-formed. */
@@ -56,7 +59,7 @@ function backTo(back: string, error?: LibraryError): never {
 
 /** Map a platform error onto one of our codes; anything unexpected is "failed". */
 function codeFor(err: unknown): LibraryError {
-  const detail = String((err as { detail?: string })?.detail ?? "");
+  const detail = String((err as { details?: string })?.details ?? "");
   const message = String((err as { message?: string })?.message ?? err ?? "");
   if (detail === "name_taken") return "name_taken";
   if (detail === "name") return "bad_name";
@@ -90,7 +93,12 @@ export async function bulkAction(form: FormData): Promise<void> {
       if (invalid.length || !tags.length) error = "bad_tags";
       else await client.rpc.bulk_tag({ media_ids: ids, add: tags });
     } else if (op === "add-set" || op === "remove-set") {
-      const setId = parseIds([String(form.get("set_id") ?? "")])[0];
+      // Remove acts on the set being viewed (the hidden `open_set`), not on
+      // whatever the "Add to set" dropdown happens to be showing.
+      const setId =
+        op === "remove-set"
+          ? (parseIds([String(form.get("open_set") ?? "")])[0] ?? parseIds([String(form.get("set_id") ?? "")])[0])
+          : parseIds([String(form.get("set_id") ?? "")])[0];
       if (!setId) error = "no_set";
       else await client.rpc.set_media_set_items({ set_id: setId, media_ids: ids, action: op === "add-set" ? "add" : "remove" });
     } else if (op === "delete") {
@@ -99,7 +107,7 @@ export async function bulkAction(form: FormData): Promise<void> {
       // No egress is spent here: the tray renders one mint-on-click button per
       // file, so a selection the user never downloads costs nothing.
       const clean = withoutParam(back, "dl");
-      target = `/library${clean}${clean ? "&" : "?"}dl=${ids.join(",")}`;
+      target = `/library${clean}${clean ? "&" : "?"}dl=${ids.slice(0, DL_TRAY_MAX).join(",")}`;
     } else {
       error = "failed";
     }
@@ -190,7 +198,7 @@ export async function setAction(form: FormData): Promise<void> {
       const name = validateSetName(form.get("name") as string);
       if (!setId) error = "no_set";
       else if (!name) error = "bad_name";
-      else await client.rpc.update_media_set({ set_id: setId, name, ...(rawDescription ? { description: rawDescription } : {}) });
+      else await client.rpc.update_media_set({ set_id: setId, name, description: rawDescription });
     } else if (op === "delete") {
       if (!setId) error = "no_set";
       else {
