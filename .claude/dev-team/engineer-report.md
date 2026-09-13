@@ -1,54 +1,58 @@
 # Engineer Report
-**Task:** Item A — shell + home for the SB Command Center rebuild (header, popups, date range, home grid, stub pages, design tokens)
-**Branch:** feat/shell-home (worktree `.claude/worktrees/shell-home`)
-**Date:** 2026-09-12
+
+**Task:** Item B — Financial Information page (`/financials`) + home Financial panel, per DESIGN.md
+**Branch:** `feat/financials` (worktree `.claude/worktrees/financials`, off `feat/shell-home` @ 6653b70)
+**Date:** 2026-09-13
 
 ## Design Decisions
-- Header renders per page (`AppHeader`), not in `app/layout.tsx`: App Router layouts never receive `searchParams`, and every header control is driven by `?from&to` — this deviates from the spawn prompt's literal "new header in layout.tsx" and is listed under conflicts below.
-- Popups are native `<details>` + CSS with no client JS; `?popup=integrations|settings` seeds `open` server-side so a panel's "Connect …" link can open the Integrations popup (a fragment link cannot set `open`, which DESIGN.md's "link that opens the popup" otherwise requires).
-- Date pill writes `?from&to` only — `lib/overview.ts parseRange` stays the single range parser; presets are pure (`rangePresets`) and the custom form is a plain `<form method="get">` with `<input type="date">`, so no date library.
-- Panel state is derived from `connector_health_v1` alone (`lib/panels.ts panelState`): a panel with no health row reads not-connected even if rows exist, so an empty SB account renders the state Nate sees first rather than fake zeros.
-- Meet and Monday panels take `notes` / `tasks` props and are handed `[]` today — that is item D's seam onto `jobs_v1` / `messages_v1`; full chrome and all three states already render.
-- Financial rows: Expenses = ad spend + `manualExpensesMinor` (absent today), Profit = revenue − expenses. `FinancialInputs.manualExpensesMinor` is item B's seam.
-- All pure logic (range labels, presets, formatters, Meta rollup, panel state, financial rows) lives in `lib/*.ts` with `tsx --test` unit tests; components stay render-only.
-- Money stays in minor units to the render boundary; rates (ROAS/CPC/CPP) are recomputed from period totals, never averaged across days.
+
+- All pure logic lives in `lib/financials.ts` (validation, totals, tiles, daily merge, home rows) so `tests/financials.test.mjs` covers it without a DB; the page and the server action are thin.
+- Validation is server-side in `parseEntryInput`; HTML `required`/`step`/`maxlength` are convenience only. A rejected submit never reaches `save_record`.
+- No client JS: the form is a plain `<form action={serverAction}>`. Errors come back as `redirect('/financials?error=<code>&f_*=…')` — a fixed code set mapped to messages server-side (`entryErrorMessage` returns `null` for anything unknown), so a crafted query string cannot render arbitrary text. `f_*` params re-fill the form.
+- Entries are filtered on `attributes->>date` (the `YYYY-MM-DD` string written in `client_v1.timezone`), not on `occurred_at` (timestamptz), so range membership matches what the user typed rather than a UTC-shifted day.
+- `deleteFinancialEntry` re-reads `records_v1` for the posted id constrained to `kind='financial_entry'` + `source='dashboard'` before calling `delete_record` — the id arrives from a form, so a Shopify/Meta row id can't be deleted through it.
+- Null vs `$0`: `sumPresent` returns `null` only when every input is absent, so an unconnected source renders `—` and a genuine zero renders `$0`. Manual figures are `null` only when the period has no entries at all.
+- Money is integer cents end to end; `parseAmountToCents` parses the decimal string with a regex (no float math), caps at 1,000,000,000 major units and rejects non-positive values.
+- Panels size to content (`.fin-grid { align-items: start }`) — the equal-height default left the Daily Breakdown panel with ~500px of empty space in the screenshots.
 
 ## Files Changed
-- `app/layout.tsx` — sidebar removed; `Inter_Tight` via `next/font/google` (fallback `system-ui, sans-serif`) exposed as `--font-inter-tight`; body wraps children in `.page`.
-- `app/globals.css` — rewritten: the full DESIGN.md token table as CSS variables plus every header/tile/panel/row/badge/popup class and the ~1100px and 720px breakpoints; old dark-mode and blue-accent template styles dropped.
-- `app/_components/AppHeader.tsx` — title + tagline, page buttons with active state, Integrations popup, Settings popup (email / client / timezone / sign out), date-range pill with presets and custom form.
-- `app/_components/icons.tsx` — SVG icons traced from `design/Saunaboy Command Center.dc.html`, plus `SourceTile`.
-- `app/_components/Panel.tsx` — `Panel`, `PanelHead`, `DataRow`, `Delta`, `ViewAll`, `PanelButton`, `StateNote`, `Unconfigured`.
-- `app/_components/MetricCard.tsx` — metric tile and the 200×34 sparkline; renders `—` with no delta when a source is empty.
-- `app/_components/MeetPanel.tsx`, `app/_components/MondayPanel.tsx` — full chrome with the three states; row props are item D's seam.
-- `app/page.tsx` — rewritten as the home grid: 6 metric tiles, Shopify / Meta Ads / Financial Information, Google Meet / Monday.com / Content Library / Recent Activity; six `Promise.allSettled` reads so one failing view cannot blank the page.
-- `app/financials/page.tsx`, `app/library/page.tsx` — stubs with the shared header, active button, and one "this page arrives next" panel (items B and C replace them).
-- `app/integrations/page.tsx` — deleted; the route now 404s and its content lives in the header popup.
-- `app/login/actions.ts` — added `signOut()` reusing the existing `createSupabaseServer` + `redirect("/login")` pattern.
-- `lib/overview.ts` — appended `formatRangeLabel`, `formatDayLabel`, `rangePresets`, `rangeQuery`, `formatMoneyWhole`, `formatCount`, `formatCompact`, `formatRoas`, `formatDeltaArrow`, `deltaTone`, `computeMetaMetrics`.
-- `lib/panels.ts` (new) — expected sources, `panelState`, Integrations-popup rows, task/note shaping.
-- `lib/financials.ts` (new) — `computeFinancialRows`.
-- `lib/links.ts` (new) — outbound service targets + `EXTERNAL_LINK_PROPS` (`target=_blank`, `rel=noopener noreferrer`).
-- `lib/header.ts` (new) — `loadShellData` (client name, timezone, connector health via `Promise.allSettled`) and `getSignedInEmail` (uses `auth.getUser()`, not the cookie session).
-- `tests/panels.test.mjs`, `tests/financials.test.mjs` (new) and `tests/overview.test.mjs` (extended) — 70 passing assertions; registered in `package.json`'s `test` script.
-- `eslint.config.mjs` — ignore `design/**` (the vendored artboard export lints with 13 pre-existing errors from commit abf8cbb and is not app source).
+
+- `lib/financials.ts` — rewritten as the pure core: entry validation/shaping, `sumEntries`, `computeProfit`, `computeFinancialTotals`, `computeFinancialTiles` (the 7 DESIGN.md tiles), `computeDailyRows`, `financialRecordsQuery`, and the corrected home `computeFinancialRows`.
+- `lib/overview.ts` — exported the existing `isValidYmd` so the entry parser and the action reuse it instead of a second date regex.
+- `app/financials/actions.ts` — new: `createFinancialEntry` (`save_record('financial_entry', …, external_id=uuid, title=category, occurred_at=date)`) and `deleteFinancialEntry` (ownership-checked `delete_record`), both revalidating `/financials` and `/`.
+- `app/financials/page.tsx` — rewritten from the item A stub: 7 metric tiles with previous-period deltas, Daily Breakdown table (days with nothing omitted, empty state otherwise), Manual Entries panel (error banner, form, newest-first list with delete, "No entries yet.").
+- `app/page.tsx` — additive: `records_v1` joins the existing `Promise.allSettled`, manual income/expense totals feed `computeFinancialRows` for both periods, and the panel shows `data` whenever entries exist even with no connector.
+- `app/globals.css` — appended `/* === item B: financials === */` only: `.metric-row--7`, `.fin-grid`, `.fin-table`, `.entry-form`, `.entry-list`, `.form-error`, `.btn-link-danger`, all on existing tokens.
+- `tests/financials.test.mjs` — 7 tests → 24, covering amount parsing (incl. no float drift and the `<script>` error-code case), per-field rejection, entry shaping/range/order, profit identity, tile order/labels/origins, daily merge, and Expenses = manual only.
+
+## Conflicts with DESIGN.md
+
+- Item A's `computeFinancialRows` computed `Expenses = ad spend + manual expenses` and `Profit = revenue − expenses`. DESIGN.md says the home rows are Revenue / Ad Spend / **Expenses (manual)** / Profit, and `Profit = revenue + manual income − ad spend − manual expenses`. DESIGN.md wins: both are now as specified, and the double-count of ad spend in Expenses is gone. No other conflict found; no bcns-data change is needed (`records_v1.source` exists with `dashboard` in the enum).
 
 ## Verification
-- `corepack pnpm typecheck` → `$ tsc --noEmit` (no output, exit 0)
-- `corepack pnpm lint` → `$ eslint .` (no output, exit 0)
-- `corepack pnpm test` → `# tests 71 / # pass 70 / # fail 0 / # skipped 1`
-- `corepack pnpm build` → `✓ Generating static pages (7/7)`; routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health`
-- Live pass signed in as smoke+sb on `:3101`: home renders the full grid with every panel not-connected; Integrations popup lists all five sources as "Not connected"; Settings shows the email, client "SB", `America/New_York`, and sign out redirects to `/login`; the pill's "Last 30 days" wrote `?from=2026-08-15&to=2026-09-13` and the label followed; header buttons reached `/financials` and `/library` carrying the range; `?popup=integrations` opened the popup on arrival; `/integrations` 404s; console clean (one React DevTools info line).
+
+- `corepack pnpm typecheck` → `$ tsc --noEmit`, no output, exit 0
+- `corepack pnpm lint` → `$ eslint .`, no output, exit 0
+- `corepack pnpm test` → `# tests 101 / # pass 100 / # fail 0 / # skipped 1`
+- `corepack pnpm build` → `✓ Compiled successfully`, `✓ Generating static pages (7/7)`, routes `ƒ /`, `ƒ /financials`, `ƒ /library`, `ƒ /login`, `ƒ /api/health` (run before the dev server started; the only change since is CSS)
+- Signed-in smoke as `smoke+sb@bcn-services.com` via `shot.mjs` on `http://localhost:3102`, screenshots in `~/.claude/jobs/8d474d1e/tmp/b-engineer/shots`:
+  - valid save (`smoke-test` / expense / 12.34) → row appears, tiles show Manual Expenses `$12`, Profit `-$12`, daily table shows Sep 13 with per-cell `—` for the unconnected sources
+  - `12.345`, `-3`, empty category, 501-char note, empty date → each redirects with its `error=` code, renders the matching `[role=alert]` message, creates nothing, and preserves the typed values
+  - home panel text `Revenue — / Ad Spend — / Expenses $12 / Profit -$12` — confirms Expenses is manual-only
+  - delete → list empty, all 7 tiles `—`, "Not connected yet." empty state
+- Hosted writes: 2 `financial_entry` rows created as smoke+sb with category `smoke-test`, both deleted through the UI's Delete. Net zero.
+- Dev server left running for QA on port 3102 — pid 36512, log `~/.claude/jobs/8d474d1e/tmp/dev-3102.log`.
 
 ## Deferred / Out of Scope
-- Meet/Monday rows, Financial manual figures, and the real `/financials` and `/library` pages — items B, C, D.
-- `lib/links.ts` targets are generic landing pages; SB's Shopify store handle, Meta `act_id`, and Monday board slug will replace them.
-- `campaign_daily_v1` / `creative_daily_v1` reads are capped at 1000 rows (PostgREST default) — marked with a `ponytail:` comment; a long range on a large account would roll up partial data.
-- Responsive breakpoints were written to DESIGN.md's spec but only verified at desktop width in the browser.
+
+- Editing an existing entry (DESIGN.md specifies create + delete only).
+- Pagination of manual entries: capped at `ENTRY_ROW_LIMIT = 500` per range, which no realistic range reaches.
+- Currency is taken from whichever source row supplies one (`pickCurrency`), defaulting to USD; there is no per-entry currency in the spec.
 
 ## Flags for Reviewer
-- `app/page.tsx` issues six view reads per request with `dynamic = "force-dynamic"` and no caching; `campaign_daily_v1` and `creative_daily_v1` are the two that can grow with account size and range.
-- `getSignedInEmail()` calls `auth.getUser()` on every page render — one extra auth round trip per request on top of middleware's.
-- `client.media.thumbUrls()` is wrapped in try/catch and degrades to placeholder tiles; signed-URL expiry is not handled.
-- Popups are `<details>` with no outside-click or Escape dismissal — they close only via their own summary.
-- The range comes straight from the query string into `parseRange`; the 366-day cap and reversed-range fallback there are the only guards.
+
+- `app/financials/actions.ts` — the trust boundary. Both actions take raw `FormData`; `deleteFinancialEntry` relies on the kind+source re-read for authorization on top of RLS.
+- `financialRecordsQuery` filters on a JSON path (`attributes->>date`), which cannot use a plain b-tree index; fine at this row count, worth an expression index if `records_v1` grows large.
+- `campaign_daily_v1` is read with `limit(1000)` and summed in the app — marked with a `ponytail:` comment; a range longer than ~3 years of campaigns would truncate.
+- `save_record` uses a fresh `crypto.randomUUID()` as `external_id`, so a retried submit creates a second row rather than being idempotent.
+- Three sources are read in one `Promise.allSettled`; a failing source logs and degrades to `—` rather than failing the page.
