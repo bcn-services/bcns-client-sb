@@ -10,7 +10,7 @@ const MAX_SPAN_DAYS = 366;
 const DEFAULT_SPAN_DAYS = 7;
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isValidYmd(s: unknown): s is string {
+export function isValidYmd(s: unknown): s is string {
   if (typeof s !== "string" || !YMD_RE.test(s)) return false;
   const ms = Date.parse(`${s}T00:00:00Z`);
   // Round-trip: rejects rolled-over dates like 2024-02-30.
