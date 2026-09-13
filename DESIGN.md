@@ -228,6 +228,21 @@ Header (with its button active) + a page title row, then:
   disable downloads when exhausted.
 - Empty → "No files yet. Upload your first creative."
 
+**Platform limits as built (2026-09-13, decided; lift only with a bcns-data
+change)**:
+- Set items have no order: `data.media_set_items` has no position column and
+  `set_media_set_items` accepts add/remove only, so "reorder" is not offered.
+- Thumbnails render as the placeholder tile for every file: `thumb_path` is
+  never populated and the `media_read_orig` policy only signs an original
+  while a download ticket exists, so the original is not a thumbnail source.
+- Egress is metered in bytes (`bytes_used` / `quota_bytes`), so the line
+  reads "Downloads this period: 364 B of 20 GB", not a download count.
+- Upload path: browser `@supabase/ssr` client PUTs the bytes to storage, then
+  a `register_upload` server action records the path. `client.media.upload()`
+  cannot run in the browser under Next 14 (its `base64url` decode throws in
+  the bundled Buffer polyfill). Bulk download is a tray of per-file buttons
+  that mint on click, never on render, so a refresh does not spend egress.
+
 ## Out of scope (this build)
 
 Daily Briefing (chunk 4), any chat/agent, writes back to Shopify/Meta/
