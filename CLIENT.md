@@ -2,7 +2,7 @@
 
 **Display name:** SB (store: SaunaBoy) · **Contact:** Declan, Founder
 **Project:** Command Center · **Quote:** `~/os/clients/sb/quote/2026-08-26-sb.md`
-($750 setup / $100 mo, **unsigned** as of 2026-09-12)
+($750 setup / $100 mo, **signed** per Nate 2026-09-12; the os copy isn't updated)
 
 ## Brief
 
@@ -24,6 +24,29 @@ layer; it never writes back to those systems.
 - **Daily Briefing:** an AI summary each morning of the previous day across
   every source, plus an on-demand button. This is the only AI in v1; there's no
   chat assistant.
+
+## Layout and visual (decided 2026-09-12, not built yet)
+
+- **No sidebar or tab bar.** The home view (Overview) is the one page. Remove
+  `.app-nav` from `app/layout.tsx`.
+- **Service buttons link out.** "View Shopify Dashboard", "View Ads Manager",
+  "Open Monday.com", "Join Meeting" and the like open that service's own site.
+  The dashboard doesn't rebuild those services' pages.
+- **Only two things live in the dashboard:** the combined data on the home view,
+  and the Content Library (with the Creative Folder). You reach the Content
+  Library by clicking its panel on home, not through a nav.
+- **Visual target:** match `~/os/clients/sb/SB_Reference.PNG` exactly (layout,
+  colors, type, cards, pink accent), minus its sidebar. Nate may send a design
+  file with exact values; prefer it over the PNG when it exists. Style each new
+  page to this target as it's built, not in a pass at the end.
+
+Open, because the reference and the brief disagree:
+- The reference has an "Ask the Command Center anything" bar and quick actions.
+  The brief says v1 has no chat, only the Daily Briefing. Is that strip the
+  briefing panel?
+- The reference "Financial Information" shows expenses, profit and cash flow.
+  The brief says Shopify revenue, orders and AOV only, with no QuickBooks.
+- Where do Integrations status and Settings go once the sidebar is removed?
 
 ## Config decisions
 
