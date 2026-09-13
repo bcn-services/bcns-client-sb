@@ -32,21 +32,24 @@ layer; it never writes back to those systems.
 - **Service buttons link out.** "View Shopify Dashboard", "View Ads Manager",
   "Open Monday.com", "Join Meeting" and the like open that service's own site.
   The dashboard doesn't rebuild those services' pages.
-- **Only two things live in the dashboard:** the combined data on the home view,
-  and the Content Library (with the Creative Folder). You reach the Content
-  Library by clicking its panel on home, not through a nav.
+- **Only these live in the dashboard:** the combined data on the home view, the
+  Content Library (with the Creative Folder), and the Financial Information
+  page. You reach each one by clicking its panel on home, not through a nav.
+- **No agent.** The reference's "Ask the Command Center anything" strip and its
+  quick actions are out; the AI Agent is scoped as a separate product. The
+  Daily Briefing stays (it's in the signed quote).
+- **Financial Information** combines the financial figures from every connected
+  app: Shopify revenue, orders and AOV, and Meta ad spend. Its page may also
+  let SB enter figures those apps don't track, stored as dashboard records
+  through `save_record` (no new migration). That goes beyond the quote, which
+  scopes the report to Shopify only.
+- **Settings and Integrations** are icon buttons in the header, each opening a
+  popup. Integrations shows each connection's status. This replaces the
+  `/integrations` page.
 - **Visual target:** match `~/os/clients/sb/SB_Reference.PNG` exactly (layout,
   colors, type, cards, pink accent), minus its sidebar. Nate may send a design
   file with exact values; prefer it over the PNG when it exists. Style each new
   page to this target as it's built, not in a pass at the end.
-
-Open, because the reference and the brief disagree:
-- The reference has an "Ask the Command Center anything" bar and quick actions.
-  The brief says v1 has no chat, only the Daily Briefing. Is that strip the
-  briefing panel?
-- The reference "Financial Information" shows expenses, profit and cash flow.
-  The brief says Shopify revenue, orders and AOV only, with no QuickBooks.
-- Where do Integrations status and Settings go once the sidebar is removed?
 
 ## Config decisions
 
