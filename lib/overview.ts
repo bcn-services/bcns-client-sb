@@ -11,7 +11,10 @@ const DEFAULT_SPAN_DAYS = 7;
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function isValidYmd(s: unknown): s is string {
-  return typeof s === "string" && YMD_RE.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
+  if (typeof s !== "string" || !YMD_RE.test(s)) return false;
+  const ms = Date.parse(`${s}T00:00:00Z`);
+  // Round-trip: rejects rolled-over dates like 2024-02-30.
+  return !Number.isNaN(ms) && utcMsToYmd(ms) === s;
 }
 
 function ymdToUtcMs(ymd: string): number {
@@ -205,9 +208,13 @@ export function computeOverviewMetrics(currentRows: DailySummaryLike[], previous
  *  the given currency (e.g. JPY -> 0), not hardcoded /100. */
 export function formatMoney(minorUnits: number | null, currency = "USD"): string {
   if (minorUnits === null) return "—";
-  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
-  const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
-  return fmt.format(minorUnits / 10 ** digits);
+  try {
+    const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency });
+    const digits = fmt.resolvedOptions().maximumFractionDigits ?? 2;
+    return fmt.format(minorUnits / 10 ** digits);
+  } catch {
+    return "—"; // malformed currency code from a row must not crash the page
+  }
 }
 
 export function formatPercent(ratio: number | null, fractionDigits = 1): string {
@@ -360,6 +367,7 @@ const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 /** Coarse relative time ("3 hours ago", "in 2 days") for activity timestamps. */
 export function formatRelativeTime(iso: string, now: Date = new Date()): string {
   const diffSec = Math.round((new Date(iso).getTime() - now.getTime()) / 1000);
+  if (!Number.isFinite(diffSec)) return "—";
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
   const abs = Math.abs(diffSec);
   for (const [unit, secs] of RELATIVE_UNITS) {

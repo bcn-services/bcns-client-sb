@@ -62,8 +62,11 @@ export default async function OverviewPage({
 
   const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR] = await Promise.allSettled([
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
-    client.views.campaign_daily_v1().gte("day", range.from).lte("day", range.to),
-    client.views.creative_daily_v1().gte("day", range.from).lte("day", range.to),
+    // ponytail: rows capped at 1000 (Supabase's PostgREST default); a large
+    // account over a long range gets partial rollups. Upgrade: a per-range
+    // aggregate RPC in bcns-data.
+    client.views.campaign_daily_v1().gte("day", range.from).lte("day", range.to).limit(1000),
+    client.views.creative_daily_v1().gte("day", range.from).lte("day", range.to).limit(1000),
     client.views.media_sets_v1().order("created_at", { ascending: false }).limit(6),
     client.views.media_v1().is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(10),
@@ -96,26 +99,18 @@ export default async function OverviewPage({
   const topCampaigns = !campaigns.error ? aggregateCampaigns(campaigns.data ?? []) : null;
   const topCreative = !creatives.error ? bestCreative(creatives.data ?? []) : null;
 
-  let creativeThumbUrl: string | null = null;
-  if (topCreative?.thumbPath) {
-    try {
-      const urls = await client.media.thumbUrls([topCreative.thumbPath]);
-      creativeThumbUrl = urls[topCreative.thumbPath] ?? null;
-    } catch (err) {
-      console.error("overview: creative thumbUrls failed", err instanceof Error ? err.message : err);
-    }
-  }
-
   const setThumbPaths = !mediaSets.error ? (mediaSets.data ?? []).map((s) => s.cover_thumb_path).filter((p): p is string => Boolean(p)) : [];
   const mediaThumbPaths = !media.error ? (media.data ?? []).map((m) => m.thumb_path).filter((p): p is string => Boolean(p)) : [];
+  const allThumbPaths = [...(topCreative?.thumbPath ? [topCreative.thumbPath] : []), ...setThumbPaths, ...mediaThumbPaths];
   let thumbUrls: Record<string, string | null> = {};
-  if (setThumbPaths.length || mediaThumbPaths.length) {
+  if (allThumbPaths.length) {
     try {
-      thumbUrls = await client.media.thumbUrls([...setThumbPaths, ...mediaThumbPaths]);
+      thumbUrls = await client.media.thumbUrls(allThumbPaths);
     } catch (err) {
-      console.error("overview: content library thumbUrls failed", err instanceof Error ? err.message : err);
+      console.error("overview: thumbUrls failed", err instanceof Error ? err.message : err);
     }
   }
+  const creativeThumbUrl = topCreative?.thumbPath ? thumbUrls[topCreative.thumbPath] ?? null : null;
 
   return (
     <>

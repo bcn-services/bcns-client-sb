@@ -2,7 +2,7 @@
  * overview.test.mjs — pure-logic coverage for lib/overview.ts (date ranges,
  * metric aggregation/deltas, campaign/creative rollups, money formatting,
  * URL safety). Run with:
- *   corepack pnpm --filter @bcn-services/hosted-web-template test
+ *   corepack pnpm test
  */
 
 import { test } from "node:test";
@@ -168,4 +168,18 @@ test("formatRelativeTime: recent past renders as '... ago'", () => {
   const now = new Date("2026-09-12T12:00:00Z");
   const iso = new Date("2026-09-12T09:00:00Z").toISOString();
   assert.match(formatRelativeTime(iso, now), /ago/);
+});
+
+test("parseRange: rolled-over calendar date (2024-02-30) falls back to default", () => {
+  const r = parseRange({ from: "2024-02-30", to: "2024-03-05" }, "2026-09-12");
+  assert.equal(r.usedDefault, true);
+  assert.equal(r.to, "2026-09-12");
+});
+
+test("formatMoney: malformed currency code returns — instead of throwing", () => {
+  assert.equal(formatMoney(1234, "not-a-currency"), "—");
+});
+
+test("formatRelativeTime: unparsable timestamp returns — instead of throwing", () => {
+  assert.equal(formatRelativeTime("garbage"), "—");
 });
