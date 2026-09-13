@@ -11,7 +11,7 @@
 import { getDataClient } from "@/lib/data";
 import { getSignedInEmail, loadShellData } from "@/lib/header";
 import { SERVICE_LINKS } from "@/lib/links";
-import { computeFinancialRows } from "@/lib/financials";
+import { computeFinancialRows, financialRecordsQuery, shapeEntries, sumEntries } from "@/lib/financials";
 import { panelState } from "@/lib/panels";
 import {
   aggregateCampaigns,
@@ -64,7 +64,7 @@ export default async function HomePage({
   const query = rangeQuery(range);
   const connectHref = `${query}&popup=integrations`;
 
-  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR] = await Promise.allSettled([
+  const [summaryR, campaignR, creativeR, mediaSetsR, mediaR, activityR, recordsR] = await Promise.allSettled([
     client.views.daily_summary_v1().gte("day", range.prevFrom).lte("day", range.to).order("day"),
     // ponytail: rows capped at 1000 (PostgREST's default); a large account over
     // a long range gets partial rollups. Upgrade: a per-range aggregate RPC in
@@ -74,6 +74,7 @@ export default async function HomePage({
     client.views.media_sets_v1().order("created_at", { ascending: false }).limit(6),
     client.views.media_v1().is("deleted_at", null).order("created_at", { ascending: false }).limit(6),
     client.views.activity_v1().order("occurred_at", { ascending: false }).limit(5),
+    financialRecordsQuery(client, range.prevFrom, range.to),
   ]);
 
   const summary = unwrap(summaryR);
@@ -82,6 +83,7 @@ export default async function HomePage({
   const mediaSets = unwrap(mediaSetsR);
   const media = unwrap(mediaR);
   const activity = unwrap(activityR);
+  const records = unwrap(recordsR);
 
   for (const [name, r] of [
     ["daily_summary_v1", summary],
@@ -90,6 +92,7 @@ export default async function HomePage({
     ["media_sets_v1", mediaSets],
     ["media_v1", media],
     ["activity_v1", activity],
+    ["records_v1", records],
   ] as const) {
     if (r.error) console.error(`home: ${name} read failed`, r.error instanceof Error ? r.error.message : r.error);
   }
@@ -102,11 +105,24 @@ export default async function HomePage({
   const topCampaigns = aggregateCampaigns(campaignSplit.current);
   const topCreative = bestCreative(creatives.data ?? []);
 
+  // Manual entries are dashboard-sourced, so the Expenses and Profit rows read
+  // right even with no connector: DESIGN.md's Expenses is the manual expenses
+  // alone and Profit = revenue + manual income - ad spend - manual expenses.
+  const entryRows = records.error ? [] : (records.data ?? []);
+  const entryTotals = sumEntries(shapeEntries(entryRows, range.from, range.to));
+  const prevEntryTotals = sumEntries(shapeEntries(entryRows, range.prevFrom, range.prevTo));
   const financialRows = computeFinancialRows(
-    { revenueMinor: metrics.revenue.value, adSpendMinor: meta.spend.value },
+    {
+      revenueMinor: metrics.revenue.value,
+      adSpendMinor: meta.spend.value,
+      manualIncomeMinor: entryTotals.count ? entryTotals.incomeMinor : null,
+      manualExpensesMinor: entryTotals.count ? entryTotals.expensesMinor : null,
+    },
     {
       revenueMinor: summarySplit.previous.length ? summarySplit.previous.reduce((a, r) => a + Number(r.revenue_minor ?? 0), 0) : null,
       adSpendMinor: campaignSplit.previous.length ? campaignSplit.previous.reduce((a, r) => a + Number(r.spend_minor ?? 0), 0) : null,
+      manualIncomeMinor: prevEntryTotals.count ? prevEntryTotals.incomeMinor : null,
+      manualExpensesMinor: prevEntryTotals.count ? prevEntryTotals.expensesMinor : null,
     },
   );
 
@@ -117,6 +133,8 @@ export default async function HomePage({
     ["shopify", "meta"],
     (!summary.error && summarySplit.current.length > 0) || (!campaigns.error && campaignSplit.current.length > 0),
   );
+  // Manual entries need no connector, so they alone are enough to render rows.
+  const financialPanelState = entryTotals.count ? "data" : financialState;
   // Item D wires these two to jobs_v1 / messages_v1; the panels already take rows.
   const mondayState = panelState(shell.health, ["monday"], false);
   const meetState = panelState(shell.health, ["meet"], false);
@@ -179,7 +197,7 @@ export default async function HomePage({
         />
         <Panel>
           <PanelHead tile={<FinanceIcon />} title="Financial Information" />
-          {financialState === "data" ? (
+          {financialPanelState === "data" ? (
             <div className="rows">
               {financialRows.map((row) => (
                 <div className="row row--roomy" key={row.key}>
@@ -190,7 +208,7 @@ export default async function HomePage({
               ))}
             </div>
           ) : (
-            <StateNote state={financialState} label="Shopify and Meta" connectHref={connectHref} />
+            <StateNote state={financialPanelState} label="Shopify and Meta" connectHref={connectHref} />
           )}
           <PanelButton href={`/financials${query}`} label="Open Financials" />
         </Panel>
