@@ -97,6 +97,11 @@ test("sortPriorityTasks: open before done, then soonest due, undated last", () =
   assert.equal(tasks[0].title, "d");
 });
 
+test("sortPriorityTasks: default cap is 5, from a server-shaped batch of 50", () => {
+  const tasks = Array.from({ length: 50 }, (_, i) => ({ title: `t${i}`, due_on: `2026-09-${String((i % 28) + 1).padStart(2, "0")}` }));
+  assert.equal(sortPriorityTasks(tasks).length, 5);
+});
+
 test("noteExcerpt: collapses whitespace, cuts on a word boundary", () => {
   assert.equal(noteExcerpt("  hello\n\n  world "), "hello world");
   assert.equal(noteExcerpt(null), "");
@@ -114,4 +119,9 @@ test("sortRecentNotes: newest first, undated last, limited", () => {
   ];
   assert.deepEqual(sortRecentNotes(notes).map((n) => n.title), ["new", "old", "none"]);
   assert.deepEqual(sortRecentNotes(notes, 1).map((n) => n.title), ["new"]);
+});
+
+test("sortRecentNotes: default cap is 3, from a server-shaped batch of 50", () => {
+  const notes = Array.from({ length: 50 }, (_, i) => ({ title: `n${i}`, occurred_at: `2026-09-${String((i % 28) + 1).padStart(2, "0")}T00:00:00Z` }));
+  assert.equal(sortRecentNotes(notes).length, 3);
 });

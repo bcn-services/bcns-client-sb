@@ -10,7 +10,7 @@ const MAX_SPAN_DAYS = 366;
 const DEFAULT_SPAN_DAYS = 7;
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function isValidYmd(s: unknown): s is string {
+export function isValidYmd(s: unknown): s is string {
   if (typeof s !== "string" || !YMD_RE.test(s)) return false;
   const ms = Date.parse(`${s}T00:00:00Z`);
   // Round-trip: rejects rolled-over dates like 2024-02-30.
@@ -73,10 +73,13 @@ function safeDiv(n: number, d: number): number | null {
   return d ? n / d : null;
 }
 
-/** null when either side is absent, or previous is 0 (avoids a meaningless /0 "—"). */
+/** null when either side is absent, or previous is 0 (avoids a meaningless /0 "—").
+ *  Divides by |previous| so a signed metric (Profit) keeps the direction of the
+ *  real change: a loss that shrank is a rise, not a fall. Identical to /previous
+ *  for the non-negative metrics. */
 export function pctDeltaOrNull(current: number | null, previous: number | null): number | null {
   if (current === null || previous === null || previous === 0) return null;
-  return (current - previous) / previous;
+  return (current - previous) / Math.abs(previous);
 }
 
 export interface DailySummaryLike {
