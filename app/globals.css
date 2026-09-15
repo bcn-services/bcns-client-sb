@@ -351,29 +351,13 @@ summary::-webkit-details-marker {
   margin-bottom: 16px;
 }
 
-/* Daily row (chunk 4, not in the artboard): Daily Briefing, then the Daily
-   Financial Report. */
+/* Daily row (chunk 4, not in the artboard): the Daily Financial Report. */
 .grid-daily {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-bottom: 16px;
   align-items: stretch;
-}
-
-.briefing__text {
-  margin: 4px 0 8px;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--text);
-  white-space: pre-line;
-}
-
-.briefing__flash {
-  margin: 0 0 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--accent);
 }
 
 .panel__meta {
@@ -422,9 +406,6 @@ summary::-webkit-details-marker {
   }
   .meta-split {
     grid-template-columns: 1fr;
-  }
-  .grid-daily {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
