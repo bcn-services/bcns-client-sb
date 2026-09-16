@@ -1,3 +1,5 @@
+> **Moved.** As of 2026-09-16 this code lives in [bcn-services/bcns](https://github.com/bcn-services/bcns) under `apps/sb/` (branch `platform-v1`, merge PR [#31](https://github.com/bcn-services/bcns/pull/31); plan: `docs/architecture/platform-v1.md`). Open issues and PRs there. This repo is **frozen** (no further changes here) until the platform's chunk 7 cutover; it is not archived yet.
+
 ---
 type: workflow-app
 delivery: hosted-web
